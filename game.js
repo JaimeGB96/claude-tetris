@@ -13,6 +13,7 @@ const COLORS = [
   '#e57373', // Z - red
   '#7986cb', // J - indigo
   '#ffb74d', // L - orange
+  '#fff59d', // Rayo - power-up
 ];
 
 const PIECES = [
@@ -24,9 +25,13 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[8]],                                       // Rayo (power-up)
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
+const RAYO = 8;
+const POWER_EVERY = 5;
+const RAYO_CELL_SCORE = 10;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -45,6 +50,7 @@ const THEME_KEY = 'tetris-theme';
 let gridColor = '#22222e';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let nextPowerAt, pendingPower;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -54,6 +60,11 @@ function randomPiece() {
   const type = Math.floor(Math.random() * 7) + 1;
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+}
+
+function rayoPiece() {
+  const shape = PIECES[RAYO].map(row => [...row]);
+  return { type: RAYO, shape, x: Math.floor(COLS / 2), y: 0 };
 }
 
 function collide(shape, ox, oy) {
@@ -109,6 +120,10 @@ function clearLines() {
   }
   if (cleared) {
     lines += cleared;
+    if (lines >= nextPowerAt) {
+      pendingPower = true;
+      while (nextPowerAt <= lines) nextPowerAt += POWER_EVERY;
+    }
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
@@ -139,15 +154,33 @@ function softDrop() {
   }
 }
 
+function applyRayo() {
+  const r = current.y, c = current.x;
+  let cells = 0;
+  for (let i = 0; i < ROWS; i++) {
+    if (board[i][c]) { cells++; board[i][c] = 0; }
+  }
+  cells += board[r].filter(v => v !== 0).length;
+  board.splice(r, 1);
+  board.unshift(new Array(COLS).fill(0));
+  score += cells * RAYO_CELL_SCORE * level;
+  updateHUD();
+}
+
 function lockPiece() {
-  merge();
-  clearLines();
+  if (current.type === RAYO) {
+    applyRayo();
+  } else {
+    merge();
+    clearLines();
+  }
   spawn();
 }
 
 function spawn() {
   current = next;
-  next = randomPiece();
+  next = pendingPower ? rayoPiece() : randomPiece();
+  pendingPower = false;
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
@@ -169,6 +202,13 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   // highlight
   context.fillStyle = 'rgba(255,255,255,0.12)';
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  if (colorIndex === RAYO) {
+    context.fillStyle = '#333';
+    context.font = `${Math.floor(size * 0.7)}px sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('⚡', x * size + size / 2, y * size + size / 2 + 1);
+  }
   context.globalAlpha = 1;
 }
 
@@ -270,6 +310,8 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  nextPowerAt = POWER_EVERY;
+  pendingPower = false;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
