@@ -166,6 +166,17 @@ body {
   border-radius: 4px;
 }
 
+/* ---- Skins ---- */
+.skin-select {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
